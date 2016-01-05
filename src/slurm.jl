@@ -13,6 +13,7 @@ function launch(manager::SlurmManager, params::Dict, instances_arr::Array,
         exename = params[:exename]
         exeflags = params[:exeflags]
         p = copy(params)
+        p = delete!(p, :J)
         p = delete!(p, :dir)
         p = delete!(p, :exename)
         p = delete!(p, :exeflags)
@@ -40,7 +41,13 @@ function launch(manager::SlurmManager, params::Dict, instances_arr::Array,
         map(rm, filter(t -> ismatch(r"job.*\.out", t), readdir(exehome)))
 
         np = manager.np
-        jobname = "julia-$(getpid())"
+
+        if get(params, :J, nothing) != nothing
+            jobname = `$(params[:J])-julia-$(getpid())`
+        else
+            jobname = `julia-$(getpid())`
+        end
+
         srun_cmd = `srun -J $jobname -n $np -o "job%4t.out" -D $exehome $(srunargs) $exename $exeflags --worker`
         out, srun_proc = open(srun_cmd)
         for i = 0:np - 1

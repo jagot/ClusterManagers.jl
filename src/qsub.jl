@@ -35,6 +35,7 @@ function launch(manager::Union{PBSManager, SGEManager}, params::Dict, instances_
         end
 
         p = copy(params)
+        p = delete!(p, :N)
         p = delete!(p, :qsub_env)
         p = delete!(p, :q)
         p = delete!(p, :dir)
@@ -63,7 +64,11 @@ function launch(manager::Union{PBSManager, SGEManager}, params::Dict, instances_
 
         np = manager.np
 
-        jobname = `julia-$(getpid())`
+        if get(params, :N, nothing) != nothing
+            jobname = `$(params[:N])-julia-$(getpid())`
+        else
+            jobname = `julia-$(getpid())`
+        end
 
         cmd = `cd $dir && $exename $exeflags --worker`
         qsub_cmd = pipeline(`echo $(Base.shell_escape(cmd))` , (isPBS ? `qsub -N $jobname -j oe -k o -t 1-$np $queue $qsub_env $(qsubargs)` : `qsub -N $jobname -terse -j y -t 1-$np $queue $qsub_env $(qsubargs)`))
