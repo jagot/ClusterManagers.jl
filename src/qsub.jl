@@ -34,12 +34,40 @@ function launch(manager::Union{PBSManager, SGEManager}, params::Dict, instances_
             qsub_env = `-v $evar`
         end
 
+        p = copy(params)
+        p = delete!(p, :qsub_env)
+        p = delete!(p, :q)
+        p = delete!(p, :dir)
+        p = delete!(p, :exename)
+        p = delete!(p, :exeflags)
+        p = delete!(p, :topology)
+        qsubargs = []
+        for k in keys(p)
+            if length(string(k)) == 1
+                push!(qsubargs, "-$k")
+                val = p[k]
+                if length(val) > 0
+                    push!(qsubargs, "$(p[k])")
+                end
+            else
+                k2 = replace(string(k), "_", "-")
+                println(k)
+                val = p[k]
+                if length(val) > 0
+                    push!(qsubargs, "--$(k2)=$(p[k])")
+                else
+                    push!(qsubargs, "--$(k2)")
+                end
+            end
+        end
+
         np = manager.np
 
         jobname = `julia-$(getpid())`
 
         cmd = `cd $dir && $exename $exeflags --worker`
-        qsub_cmd = pipeline(`echo $(Base.shell_escape(cmd))` , (isPBS ? `qsub -N $jobname -j oe -k o -t 1-$np $queue $qsub_env` : `qsub -N $jobname -terse -j y -t 1-$np $queue $qsub_env`))
+        qsub_cmd = pipeline(`echo $(Base.shell_escape(cmd))` , (isPBS ? `qsub -N $jobname -j oe -k o -t 1-$np $queue $qsub_env $(qsubargs)` : `qsub -N $jobname -terse -j y -t 1-$np $queue $qsub_env $(qsubargs)`))
+
         out,qsub_proc = open(qsub_cmd)
         if !success(qsub_proc)
             println("batch queue not available (could not run qsub)")
